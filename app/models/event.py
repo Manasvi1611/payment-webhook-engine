@@ -1,0 +1,46 @@
+from datetime import datetime
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, HttpUrl, field_validator
+
+VALID_EVENT_TYPES = frozenset(
+    ["payment.success", "payment.failed", "payment.refunded"]
+)
+
+
+class EventCreate(BaseModel):
+    event_type: Literal["payment.success", "payment.failed", "payment.refunded"]
+    payload: dict[str, Any]
+
+
+class EventResponse(BaseModel):
+    id: str
+    event_type: str
+    payload: dict[str, Any]
+    queued_at: datetime
+
+
+class SubscriberCreate(BaseModel):
+    name: str
+    url: str
+    events: list[str]
+    secret: str
+
+    @field_validator("events")
+    @classmethod
+    def events_must_be_valid(cls, v: list[str]) -> list[str]:
+        invalid = set(v) - VALID_EVENT_TYPES
+        if invalid:
+            raise ValueError(f"Unknown event types: {invalid}")
+        return v
+
+
+class SubscriberResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    url: str
+    events: list[str]
+    active: bool
+    created_at: datetime
