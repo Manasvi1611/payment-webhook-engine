@@ -2,6 +2,7 @@ import os
 import time
 
 import pandas as pd
+import plotly.express as px
 import streamlit as st
 from sqlalchemy import create_engine, text
 
@@ -38,21 +39,50 @@ try:
         dlq = conn.execute(
             text("SELECT COUNT(*) FROM delivery_logs WHERE status = 'dead_letter'")
         ).scalar() or 0
+        pending = conn.execute(
+            text("SELECT COUNT(*) FROM delivery_logs WHERE status = 'pending'")
+        ).scalar() or 0
 
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Total Deliveries", total)
-        col2.metric("Successful", success, delta=None)
-        col3.metric("Failed (retrying)", failed)
-        col4.metric("Dead Letter", dlq)
+        col2.markdown(
+            f'<p style="font-size:.875rem;margin:0 0 4px;color:rgba(250,250,250,0.6)">Successful</p>'
+            f'<p style="font-size:1.875rem;font-weight:600;color:#10b981;margin:0;line-height:1.2">{success}</p>',
+            unsafe_allow_html=True,
+        )
+        col3.markdown(
+            f'<p style="font-size:.875rem;margin:0 0 4px;color:rgba(250,250,250,0.6)">Failed (retrying)</p>'
+            f'<p style="font-size:1.875rem;font-weight:600;color:#ef4444;margin:0;line-height:1.2">{failed}</p>',
+            unsafe_allow_html=True,
+        )
+        col4.markdown(
+            f'<p style="font-size:.875rem;margin:0 0 4px;color:rgba(250,250,250,0.6)">Dead Letter</p>'
+            f'<p style="font-size:1.875rem;font-weight:600;color:#f59e0b;margin:0;line-height:1.2">{dlq}</p>',
+            unsafe_allow_html=True,
+        )
 
         success_rate = round(success / total * 100, 1) if total else 0
         st.progress(success_rate / 100, text=f"Success rate: {success_rate}%")
 
         st.subheader("Status Distribution")
-        status_df = pd.DataFrame(
-            {"Status": ["Success", "Failed", "Dead Letter"], "Count": [success, failed, dlq]}
-        ).set_index("Status")
-        st.bar_chart(status_df)
+        status_df = pd.DataFrame({
+            "Status": ["Success", "Failed", "Dead Letter", "Pending"],
+            "Count": [success, failed, dlq, pending],
+        })
+        fig = px.bar(
+            status_df,
+            x="Status",
+            y="Count",
+            color="Status",
+            color_discrete_map={
+                "Success":     "#10b981",
+                "Failed":      "#ef4444",
+                "Dead Letter": "#f59e0b",
+                "Pending":     "#3b82f6",
+            },
+        )
+        fig.update_layout(showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
 
         st.subheader("Recent Deliveries")
         df = pd.read_sql(
