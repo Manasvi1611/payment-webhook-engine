@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, HttpUrl, field_validator
 
@@ -29,6 +29,23 @@ class SubscriberCreate(BaseModel):
     @field_validator("events")
     @classmethod
     def events_must_be_valid(cls, v: list[str]) -> list[str]:
+        invalid = set(v) - VALID_EVENT_TYPES
+        if invalid:
+            raise ValueError(f"Unknown event types: {invalid}")
+        return v
+
+
+class SubscriberUpdate(BaseModel):
+    name: Optional[str] = None
+    url: Optional[str] = None
+    events: Optional[list[str]] = None
+    secret: Optional[str] = None
+
+    @field_validator("events")
+    @classmethod
+    def events_must_be_valid(cls, v: Optional[list[str]]) -> Optional[list[str]]:
+        if v is None:
+            return v
         invalid = set(v) - VALID_EVENT_TYPES
         if invalid:
             raise ValueError(f"Unknown event types: {invalid}")
